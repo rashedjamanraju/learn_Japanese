@@ -337,23 +337,55 @@
     }
 
     const audioPlayer = document.getElementById('ttsAudioPlayer');
-    function playAudio(text, rate = 1.0, label = '', onEnd = null) {
-      if (label) document.getElementById('statusBox').innerText = `🔊 বাজছে: ${label}`;
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`;
-      audioPlayer.src = url;
-      audioPlayer.playbackRate = rate;
-      audioPlayer.onended = () => { if (onEnd) onEnd(); };
-      audioPlayer.play().catch(() => {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(text);
-          u.lang = 'ja-JP';
-          u.rate = rate;
-          u.onend = () => { if (onEnd) onEnd(); };
-          window.speechSynthesis.speak(u);
-        }
-      });
-    }
+    let speechVoices = [];
+
+function loadVoices() {
+  if ('speechSynthesis' in window) {
+    speechVoices = window.speechSynthesis.getVoices();
+  }
+}
+
+if ('speechSynthesis' in window) {
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function playAudio(text, rate = 1.0, label = '', onEnd = null) {
+  if (label) {
+    const status = document.getElementById('statusBox');
+    if (status) status.innerText = `🔊 Bajche: ${label}`;
+  }
+
+  if (!('speechSynthesis' in window)) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'ja-JP';
+  utterance.rate = rate;
+
+  if (!speechVoices.length) {
+    speechVoices = window.speechSynthesis.getVoices();
+  }
+
+  const jaVoice = speechVoices.find(v => v.lang === 'ja-JP' || v.lang.startsWith('ja'));
+  if (jaVoice) {
+    utterance.voice = jaVoice;
+  }
+
+  utterance.onend = () => {
+    if (onEnd) onEnd();
+  };
+
+  utterance.onerror = () => {
+    if (onEnd) onEnd();
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
 
     function renderDayContent() {
       const data = courseData[currentDay];
